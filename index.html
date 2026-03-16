@@ -16,9 +16,7 @@
         .link { fill: none; stroke: #e0e0e0; stroke-width: 1.5px; transition: stroke-width 0.2s; }
         .link--active { stroke: #e0e0e0; stroke-width: 3.5px; }
         
-        /* The dots are now strictly neutral gray at all times */
         .node circle { fill: #999; stroke: #fff; stroke-width: 1.5px; transition: fill 0.2s; }
-        /* Subtle darkening for active dots instead of blue */
         .node--active circle { fill: #666; }
         
         .node text { font: 10px sans-serif; transition: font-weight 0.2s; }
@@ -33,6 +31,24 @@
             pointer-events: none;
             text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 0px 2px 2px rgba(0,0,0,0.2); 
         }
+
+        /* NEW: The Floating Chalk Tooltip */
+        #chalk-tooltip {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid #ddd;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            border-radius: 8px;
+            padding: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+            z-index: 1000;
+            text-align: left;
+        }
+        .mini-link { fill: none; stroke: #ccc; stroke-width: 1.5px; }
+        .mini-node text { font-size: 10.5px; fill: #444; }
+        .mini-node--root text { fill: #0000ee; font-weight: bold; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -45,7 +61,8 @@
             <option value="wab">WAB</option>
         </select>
     </div>
+    
     <div id="bracket-container"></div>
-    <script src="app.js"></script>
+    <div id="chalk-tooltip"></div> <script src="app.js"></script>
 </body>
 </html>
