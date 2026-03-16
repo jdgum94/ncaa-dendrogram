@@ -31,6 +31,13 @@ const tree = d3.cluster().size([2 * Math.PI, radius]);
 let currentModel = document.getElementById("dataSource").value;
 const depthToProb = {5: 'R32', 4: 'S16', 3: 'E8', 2: 'F4', 1: 'F2', 0: 'Champ'};
 
+// --- SEED STRENGTH HEURISTICS ---
+// Average WAB achievement for each seed line
+const seedAverages = {
+    1: 8.5, 2: 7.0, 3: 5.5, 4: 4.5, 5: 3.5, 6: 2.8, 7: 2.0, 8: 1.5,
+    9: 1.0, 10: 0.5, 11: 0.1, 12: -0.5, 13: -1.5, 14: -2.5, 15: -3.5, 16: -4.5
+};
+
 function getWinner(d, model) {
     const leaves = d.leaves();
     const probKey = depthToProb[d.depth];
@@ -89,6 +96,7 @@ d3.json("data.json").then(data => {
     function clearHover() {
         link.classed("link--active", false);
         node.classed("node--active", false);
+        leafNodes.selectAll("text").style("fill", "#000"); // Reset colors
         hoverLayer.selectAll("*").remove();
         d3.select("#chalk-tooltip").style("opacity", 0); 
     }
@@ -98,7 +106,7 @@ d3.json("data.json").then(data => {
         clearHover();
     });
 
-    // LEAF HOVER: Highlight individual team path
+    // LEAF HOVER
     leafNodes.append("rect")
         .attr("transform", d => d.x >= Math.PI ? "rotate(180)" : null)
         .attr("x", d => d.x < Math.PI ? 0 : -110)
@@ -140,7 +148,7 @@ d3.json("data.json").then(data => {
         })
         .on("mouseout", clearHover);
 
-    // INTERNAL HOVER: Tooltip only
+    // INTERNAL HOVER
     internalNodes.select("circle")
         .on("mouseover", function(event, d) {
             clearHover();
@@ -148,24 +156,35 @@ d3.json("data.json").then(data => {
             link.classed("link--active", l => descendants.includes(l.source) && descendants.includes(l.target));
             node.classed("node--active", n => descendants.includes(n));
 
+            // --- SEED STRENGTH COLORATION (Center Dot Only + WAB Only) ---
+            if (d.depth === 0 && currentModel === 'wab') {
+                leafNodes.selectAll("text").style("fill", p => {
+                    const seed = parseInt(p.data.name.match(/\d+/));
+                    const wab = p.data.wab || 0;
+                    const expected = seedAverages[seed] || 0;
+                    const delta = wab - expected;
+
+                    if (delta >= 2.0) return "#27ae60"; // Strong Green (Underseeded)
+                    if (delta <= -2.0) return "#e74c3c"; // Strong Red (Overseeded)
+                    return "#000"; // Neutral
+                });
+            }
+
             const probKey = depthToProb[d.depth];
 
             if (probKey || currentModel === 'wab') {
                 const leaves = d.leaves();
                 
-                // Perimeter percentages/WAB
                 hoverLayer.selectAll(".prob-label-pct").data(leaves).join("text").attr("class", "prob-label-pct")
                     .attr("transform", p => `rotate(${p.x * 180 / Math.PI - 90}) translate(${radius - 15},0) ${p.x >= Math.PI ? "rotate(180)" : ""}`)
                     .attr("text-anchor", p => p.x < Math.PI ? "end" : "start").attr("dy", "0.31em")
                     .style("font-size", "11px").style("font-weight", "bold").style("fill", "#0000ee")
                     .text(p => currentModel === 'wab' ? (p.data.wab !== undefined ? p.data.wab : "") : ((p.data[currentModel] && p.data[currentModel][probKey] !== undefined) ? p.data[currentModel][probKey] + "%" : ""));
 
-                // --- TOOLTIP LOGIC (Capped at Depth 3) ---
                 const maxDepth = d.height > 3 ? 3 : d.height; 
                 const chalkTreeData = buildChalkData(d, currentModel, maxDepth);
                 const miniRoot = d3.hierarchy(chalkTreeData);
                 
-                // --- THE FIX: WIDER MARGINS & DYNAMIC WIDTH ---
                 const miniMargin = { top: 10, right: 150, bottom: 10, left: 110 };
                 const miniW = Math.max(40, miniRoot.height * 40); 
                 const miniH_calc = Math.max(40, miniRoot.leaves().length * 24); 
@@ -173,20 +192,16 @@ d3.json("data.json").then(data => {
                 const tooltipWidth = miniW + miniMargin.left + miniMargin.right + 24; 
                 const tooltipHeight = miniH_calc + miniMargin.top + miniMargin.bottom + 40; 
 
-                // Dynamic Tooltip Placement
                 let posX, posY;
                 const isRightHalf = d.x < Math.PI;
 
                 if (d.depth === 0) {
-                    // CENTER DOT
                     posX = event.pageX - (tooltipWidth / 2);
                     posY = event.pageY - (tooltipHeight / 2);
                 } else if (d.depth === 1) {
-                    // FINAL MATCHUP
                     posX = event.pageX + (isRightHalf ? -(tooltipWidth + 15) : 15);
                     posY = event.pageY - (tooltipHeight / 2);
                 } else {
-                    // FINAL 4, ELITE 8 & OUTER
                     const isBottomHalf = d.x > Math.PI / 2 && d.x < 3 * Math.PI / 2;
                     posX = event.pageX + (isRightHalf ? -(tooltipWidth + 15) : 15);
                     posY = event.pageY + (isBottomHalf ? -(tooltipHeight + 15) : 15);
