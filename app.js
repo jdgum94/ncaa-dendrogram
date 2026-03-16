@@ -8,9 +8,6 @@ const svg = d3.select("#bracket-container").append("svg")
     .append("g")
     .attr("transform", `translate(${width/2},${height/2})`);
 
-// 290px pushes the labels to a ~410px radial distance.
-// This perfectly clears the longest team names (like "16 Prairie View")
-// while keeping the region labels as tight to the graph as mathematically possible.
 const offset = 290;
 
 const regionLabels = [
@@ -100,17 +97,19 @@ d3.json("data.json").then(data => {
                     { node: ancestors[2], value: modelData.S16 },
                     { node: ancestors[3], value: modelData.E8 },
                     { node: ancestors[4], value: modelData.F4 },
-                    { node: ancestors[5], value: modelData.Champ }
+                    { node: ancestors[5], value: modelData.F2 }, 
+                    { node: ancestors[6], value: modelData.Champ }
                 ];
 
                 hoverLayer.selectAll(".prob-label")
+                    // REMOVED THE > 0 FILTER HERE
                     .data(probMapping.filter(p => p.node && p.value !== undefined))
                     .join("text")
                     .attr("class", "prob-label")
                     .attr("transform", p => {
                         const x = p.node.y * Math.cos(p.node.x - Math.PI / 2);
                         const y = p.node.y * Math.sin(p.node.x - Math.PI / 2);
-                        return `translate(${x},${y - 8})`; 
+                        return `translate(${x},${y - 10})`; 
                     })
                     .attr("text-anchor", "middle")
                     .text(p => p.value + "%");
@@ -121,20 +120,19 @@ d3.json("data.json").then(data => {
     internalNodes.select("circle")
         .on("mouseover", function(event, d) {
             clearHover();
-            
             const descendants = d.descendants();
             link.classed("link--active", l => descendants.includes(l.source) && descendants.includes(l.target));
             node.classed("node--active", n => descendants.includes(n));
 
-            const depthToProb = {5: 'R32', 4: 'S16', 3: 'E8', 2: 'F4', 1: 'Champ', 0: 'Champ'};
+            const depthToProb = {5: 'R32', 4: 'S16', 3: 'E8', 2: 'F4', 1: 'F2', 0: 'Champ'};
             const probKey = depthToProb[d.depth];
 
             if (probKey) {
                 const leaves = d.leaves();
-                hoverLayer.selectAll(".prob-label")
+                hoverLayer.selectAll(".prob-label-pct")
                     .data(leaves)
                     .join("text")
-                    .attr("class", "prob-label")
+                    .attr("class", "prob-label-pct")
                     .attr("transform", p => {
                         const isLeft = p.x >= Math.PI;
                         const angle = p.x * 180 / Math.PI - 90;
@@ -143,9 +141,12 @@ d3.json("data.json").then(data => {
                     })
                     .attr("text-anchor", p => p.x < Math.PI ? "end" : "start")
                     .attr("dy", "0.31em")
+                    .style("font-size", "10px")
+                    .style("fill", "#0000ee")
                     .text(p => {
                         const modelData = p.data[currentModel];
-                        return modelData && modelData[probKey] !== undefined ? modelData[probKey] + "%" : "";
+                        // REMOVED THE > 0 FILTER HERE
+                        return (modelData && modelData[probKey] !== undefined) ? modelData[probKey] + "%" : "";
                     });
             }
         })
