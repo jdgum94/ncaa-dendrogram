@@ -13,14 +13,3 @@ This project maps the entire 64-team tournament field into a circular hierarchy.
 * **HTML5 / CSS3** (Vanilla)
 * **JavaScript** (ES6)
 * **D3.js (v7)** - Used for calculating the radial cluster coordinates, generating the SVG bezier curves, and handling the DOM state transitions.
-
-## Running Locally (macOS / Linux)
-
-Because browsers enforce strict CORS policies that block local JavaScript from fetching JSON files directly from your hard drive, you will need to serve the files through a lightweight local web server. 
-
-macOS comes with Python pre-installed, making this a one-line process:
-
-1. Open your Terminal.
-2. Navigate to the project directory:
-   ```bash
-   cd path/to/your/repository
