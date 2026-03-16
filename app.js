@@ -8,12 +8,16 @@ const svg = d3.select("#bracket-container").append("svg")
     .append("g")
     .attr("transform", `translate(${width/2},${height/2})`);
 
-// FIX 1: Correctly mapped region coordinates
+// 290px pushes the labels to a ~410px radial distance.
+// This perfectly clears the longest team names (like "16 Prairie View")
+// while keeping the region labels as tight to the graph as mathematically possible.
+const offset = 290;
+
 const regionLabels = [
-    { name: "West", x: -width/2 + 80, y: -height/2 + 80, anchor: "start" },    // Top Left
-    { name: "Midwest", x: -width/2 + 80, y: height/2 - 80, anchor: "start" }, // Bottom Left
-    { name: "East", x: width/2 - 80, y: -height/2 + 80, anchor: "end" },      // Top Right
-    { name: "South", x: width/2 - 80, y: height/2 - 80, anchor: "end" }       // Bottom Right
+    { name: "West",    x: -offset, y: -offset }, 
+    { name: "Midwest", x: -offset, y: offset },  
+    { name: "East",    x: offset,  y: -offset }, 
+    { name: "South",   x: offset,  y: offset }   
 ];
 
 svg.selectAll(".region-label")
@@ -22,7 +26,8 @@ svg.selectAll(".region-label")
     .attr("class", "region-label")
     .attr("x", d => d.x)
     .attr("y", d => d.y)
-    .attr("text-anchor", d => d.anchor)
+    .attr("text-anchor", "middle")
+    .attr("dominant-baseline", "middle")
     .text(d => d.name);
 
 const tree = d3.cluster().size([2 * Math.PI, radius]);
@@ -74,7 +79,6 @@ d3.json("data.json").then(data => {
         clearHover();
     });
 
-    // FIX 2: Applied rotation to hitboxes so they perfectly cover the text
     leafNodes.append("rect")
         .attr("transform", d => d.x >= Math.PI ? "rotate(180)" : null)
         .attr("x", d => d.x < Math.PI ? 0 : -110)
