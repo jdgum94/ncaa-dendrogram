@@ -165,28 +165,28 @@ d3.json("data.json").then(data => {
                 const chalkTreeData = buildChalkData(d, currentModel, maxDepth);
                 const miniRoot = d3.hierarchy(chalkTreeData);
                 
-                const miniMargin = { top: 10, right: 120, bottom: 10, left: 85 };
-                const miniW = 120; 
+                // --- THE FIX: WIDER MARGINS & DYNAMIC WIDTH ---
+                const miniMargin = { top: 10, right: 150, bottom: 10, left: 110 };
+                const miniW = Math.max(40, miniRoot.height * 40); 
                 const miniH_calc = Math.max(40, miniRoot.leaves().length * 24); 
                 
                 const tooltipWidth = miniW + miniMargin.left + miniMargin.right + 24; 
                 const tooltipHeight = miniH_calc + miniMargin.top + miniMargin.bottom + 40; 
 
-                // --- NEW: REFINED DYNAMIC TOOLTIP PLACEMENT ---
+                // Dynamic Tooltip Placement
                 let posX, posY;
                 const isRightHalf = d.x < Math.PI;
 
                 if (d.depth === 0) {
-                    // CENTER DOT: Dead center over the cursor
+                    // CENTER DOT
                     posX = event.pageX - (tooltipWidth / 2);
                     posY = event.pageY - (tooltipHeight / 2);
                 } else if (d.depth === 1) {
-                    // FINAL MATCHUP (Depth 1): Direct immediate push toward center
-                    // Right node pushes left, Left node pushes right. Vertically centered.
+                    // FINAL MATCHUP
                     posX = event.pageX + (isRightHalf ? -(tooltipWidth + 15) : 15);
                     posY = event.pageY - (tooltipHeight / 2);
                 } else {
-                    // FINAL 4, ELITE 8 & OUTER: Push inward toward empty quadrant space
+                    // FINAL 4, ELITE 8 & OUTER
                     const isBottomHalf = d.x > Math.PI / 2 && d.x < 3 * Math.PI / 2;
                     posX = event.pageX + (isRightHalf ? -(tooltipWidth + 15) : 15);
                     posY = event.pageY + (isBottomHalf ? -(tooltipHeight + 15) : 15);
@@ -216,7 +216,7 @@ d3.json("data.json").then(data => {
                     .attr("x", p => !p.children ? -6 : (p.depth === 0 ? 6 : 0))
                     .attr("text-anchor", p => !p.children ? "end" : (p.depth === 0 ? "start" : "middle"))
                     .text(p => {
-                        if (p.depth === 0) {
+                        if (p.depth === 0 && p.data.value !== undefined) {
                             return p.data.name + (currentModel === 'wab' ? ` (${p.data.value})` : ` (${p.data.value}%)`);
                         }
                         return p.data.name;
