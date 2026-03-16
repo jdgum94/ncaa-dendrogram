@@ -90,29 +90,45 @@ d3.json("data.json").then(data => {
             link.classed("link--active", l => ancestors.includes(l.source) && ancestors.includes(l.target));
             node.classed("node--active", n => ancestors.includes(n));
 
-            const modelData = d.data[currentModel];
-            if (modelData) {
-                const probMapping = [
-                    { node: ancestors[1], value: modelData.R32 },
-                    { node: ancestors[2], value: modelData.S16 },
-                    { node: ancestors[3], value: modelData.E8 },
-                    { node: ancestors[4], value: modelData.F4 },
-                    { node: ancestors[5], value: modelData.F2 }, 
-                    { node: ancestors[6], value: modelData.Champ }
-                ];
+            if (currentModel === 'wab') {
+                const value = d.data.wab;
+                if (value !== undefined) {
+                    hoverLayer.append("text")
+                        .attr("class", "prob-label")
+                        .attr("transform", () => {
+                            const isLeft = d.x >= Math.PI;
+                            const angle = d.x * 180 / Math.PI - 90;
+                            const rad = radius - 15; 
+                            return `rotate(${angle}) translate(${rad},0) ${isLeft ? "rotate(180)" : ""}`;
+                        })
+                        .attr("text-anchor", d.x < Math.PI ? "end" : "start")
+                        .attr("dy", "0.31em")
+                        .text(value);
+                }
+            } else {
+                const modelData = d.data[currentModel];
+                if (modelData) {
+                    const probMapping = [
+                        { node: ancestors[1], value: modelData.R32 },
+                        { node: ancestors[2], value: modelData.S16 },
+                        { node: ancestors[3], value: modelData.E8 },
+                        { node: ancestors[4], value: modelData.F4 },
+                        { node: ancestors[5], value: modelData.F2 }, 
+                        { node: ancestors[6], value: modelData.Champ }
+                    ];
 
-                hoverLayer.selectAll(".prob-label")
-                    // REMOVED THE > 0 FILTER HERE
-                    .data(probMapping.filter(p => p.node && p.value !== undefined))
-                    .join("text")
-                    .attr("class", "prob-label")
-                    .attr("transform", p => {
-                        const x = p.node.y * Math.cos(p.node.x - Math.PI / 2);
-                        const y = p.node.y * Math.sin(p.node.x - Math.PI / 2);
-                        return `translate(${x},${y - 10})`; 
-                    })
-                    .attr("text-anchor", "middle")
-                    .text(p => p.value + "%");
+                    hoverLayer.selectAll(".prob-label")
+                        .data(probMapping.filter(p => p.node && p.value !== undefined))
+                        .join("text")
+                        .attr("class", "prob-label")
+                        .attr("transform", p => {
+                            const x = p.node.y * Math.cos(p.node.x - Math.PI / 2);
+                            const y = p.node.y * Math.sin(p.node.x - Math.PI / 2);
+                            return `translate(${x},${y - 10})`; 
+                        })
+                        .attr("text-anchor", "middle")
+                        .text(p => p.value + "%");
+                }
             }
         })
         .on("mouseout", clearHover);
@@ -127,7 +143,7 @@ d3.json("data.json").then(data => {
             const depthToProb = {5: 'R32', 4: 'S16', 3: 'E8', 2: 'F4', 1: 'F2', 0: 'Champ'};
             const probKey = depthToProb[d.depth];
 
-            if (probKey) {
+            if (probKey || currentModel === 'wab') {
                 const leaves = d.leaves();
                 hoverLayer.selectAll(".prob-label-pct")
                     .data(leaves)
@@ -141,11 +157,14 @@ d3.json("data.json").then(data => {
                     })
                     .attr("text-anchor", p => p.x < Math.PI ? "end" : "start")
                     .attr("dy", "0.31em")
-                    .style("font-size", "10px")
+                    .style("font-size", "11px")
+                    .style("font-weight", "bold")
                     .style("fill", "#0000ee")
                     .text(p => {
+                        if (currentModel === 'wab') {
+                            return p.data.wab !== undefined ? p.data.wab : "";
+                        }
                         const modelData = p.data[currentModel];
-                        // REMOVED THE > 0 FILTER HERE
                         return (modelData && modelData[probKey] !== undefined) ? modelData[probKey] + "%" : "";
                     });
             }

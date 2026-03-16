@@ -13,15 +13,13 @@
         
         #bracket-container { margin-top: -40px; }
         
-        /* The default lines stay subtle and gray */
         .link { fill: none; stroke: #e0e0e0; stroke-width: 1.5px; transition: stroke-width 0.2s; }
-        /* THE FIX: Active path gets an extra pixel of thickness (3.5px) for more structural weight */
         .link--active { stroke: #e0e0e0; stroke-width: 3.5px; }
         
-        /* The default dots are gray */
+        /* The dots are now strictly neutral gray at all times */
         .node circle { fill: #999; stroke: #fff; stroke-width: 1.5px; transition: fill 0.2s; }
-        /* Active dots turn bright blue to match the percentage text */
-        .node--active circle { fill: #0000ee; }
+        /* Subtle darkening for active dots instead of blue */
+        .node--active circle { fill: #666; }
         
         .node text { font: 10px sans-serif; transition: font-weight 0.2s; }
         .node--active text { font-weight: bold; fill: #000; }
@@ -44,10 +42,10 @@
             <option value="kenpom">KP</option>
             <option value="miya">EM(i)</option>
             <option value="torvik">BT</option>
+            <option value="wab">WAB</option>
         </select>
     </div>
     <div id="bracket-container"></div>
-
     <script src="app.js"></script>
 </body>
 </html>
