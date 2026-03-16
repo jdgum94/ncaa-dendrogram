@@ -31,8 +31,7 @@ const tree = d3.cluster().size([2 * Math.PI, radius]);
 let currentModel = document.getElementById("dataSource").value;
 const depthToProb = {5: 'R32', 4: 'S16', 3: 'E8', 2: 'F4', 1: 'F2', 0: 'Champ'};
 
-// --- SEED STRENGTH HEURISTICS ---
-// Average WAB achievement for each seed line
+// --- ANALYSIS HEURISTICS (WAB ONLY) ---
 const seedAverages = {
     1: 8.5, 2: 7.0, 3: 5.5, 4: 4.5, 5: 3.5, 6: 2.8, 7: 2.0, 8: 1.5,
     9: 1.0, 10: 0.5, 11: 0.1, 12: -0.5, 13: -1.5, 14: -2.5, 15: -3.5, 16: -4.5
@@ -43,11 +42,25 @@ function getWinner(d, model) {
     const probKey = depthToProb[d.depth];
     let winnerName = "";
     let maxVal = -Infinity;
+
     leaves.forEach(leaf => {
-        let val = (model === 'wab') ? (leaf.data.wab || 0) : ((leaf.data[model] && leaf.data[model][probKey]) ? leaf.data[model][probKey] : 0);
-        if (val > maxVal) { maxVal = val; winnerName = leaf.data.name; }
+        let val;
+        if (model === 'net') {
+            // Rank logic: lower rank (1) is better. Negative value makes 1 > 100.
+            val = -(leaf.data.net || 1000);
+        } else if (model === 'wab') {
+            val = (leaf.data.wab || 0);
+        } else {
+            val = (leaf.data[model] && leaf.data[model][probKey]) ? leaf.data[model][probKey] : 0;
+        }
+
+        if (val > maxVal) { 
+            maxVal = val; 
+            winnerName = leaf.data.name; 
+        }
     });
-    return { name: winnerName, value: maxVal };
+
+    return { name: winnerName, value: model === 'net' ? -maxVal : maxVal };
 }
 
 function buildChalkData(mainNode, model, maxDepth, currentDepth = 0) {
@@ -96,7 +109,7 @@ d3.json("data.json").then(data => {
     function clearHover() {
         link.classed("link--active", false);
         node.classed("node--active", false);
-        leafNodes.selectAll("text").style("fill", "#000"); // Reset colors
+        leafNodes.selectAll("text").style("fill", "#000"); 
         hoverLayer.selectAll("*").remove();
         d3.select("#chalk-tooltip").style("opacity", 0); 
     }
@@ -130,6 +143,18 @@ d3.json("data.json").then(data => {
                         .attr("text-anchor", d.x < Math.PI ? "end" : "start")
                         .attr("dy", "0.31em").text(value);
                 }
+            } else if (currentModel === 'net') {
+                const value = d.data.net;
+                if (value !== undefined) {
+                    hoverLayer.append("text").attr("class", "prob-label")
+                        .attr("transform", () => {
+                            const isLeft = d.x >= Math.PI;
+                            const angle = d.x * 180 / Math.PI - 90;
+                            return `rotate(${angle}) translate(${radius - 15},0) ${isLeft ? "rotate(180)" : ""}`;
+                        })
+                        .attr("text-anchor", d.x < Math.PI ? "end" : "start")
+                        .attr("dy", "0.31em").text("#" + value);
+                }
             } else {
                 const modelData = d.data[currentModel];
                 if (modelData) {
@@ -156,30 +181,32 @@ d3.json("data.json").then(data => {
             link.classed("link--active", l => descendants.includes(l.source) && descendants.includes(l.target));
             node.classed("node--active", n => descendants.includes(n));
 
-            // --- SEED STRENGTH COLORATION (Center Dot Only + WAB Only) ---
+            // --- ANALYSIS COLORATION (Center Dot Only - WAB Only) ---
             if (d.depth === 0 && currentModel === 'wab') {
                 leafNodes.selectAll("text").style("fill", p => {
-                    const seed = parseInt(p.data.name.match(/\d+/));
-                    const wab = p.data.wab || 0;
-                    const expected = seedAverages[seed] || 0;
-                    const delta = wab - expected;
-
-                    if (delta >= 2.0) return "#27ae60"; // Strong Green (Underseeded)
-                    if (delta <= -2.0) return "#e74c3c"; // Strong Red (Overseeded)
+                    const seedMatch = p.data.name.match(/\d+/);
+                    const seed = seedMatch ? parseInt(seedMatch[0]) : 0;
+                    const delta = (p.data.wab || 0) - (seedAverages[seed] || 0);
+                    if (delta >= 2.0) return "#27ae60"; // Value (Underseeded)
+                    if (delta <= -2.0) return "#e74c3c"; // Vulnerable (Overseeded)
                     return "#000"; // Neutral
                 });
             }
 
             const probKey = depthToProb[d.depth];
 
-            if (probKey || currentModel === 'wab') {
+            if (probKey || currentModel === 'wab' || currentModel === 'net') {
                 const leaves = d.leaves();
                 
                 hoverLayer.selectAll(".prob-label-pct").data(leaves).join("text").attr("class", "prob-label-pct")
                     .attr("transform", p => `rotate(${p.x * 180 / Math.PI - 90}) translate(${radius - 15},0) ${p.x >= Math.PI ? "rotate(180)" : ""}`)
                     .attr("text-anchor", p => p.x < Math.PI ? "end" : "start").attr("dy", "0.31em")
                     .style("font-size", "11px").style("font-weight", "bold").style("fill", "#0000ee")
-                    .text(p => currentModel === 'wab' ? (p.data.wab !== undefined ? p.data.wab : "") : ((p.data[currentModel] && p.data[currentModel][probKey] !== undefined) ? p.data[currentModel][probKey] + "%" : ""));
+                    .text(p => {
+                        if (currentModel === 'wab') return p.data.wab !== undefined ? p.data.wab : "";
+                        if (currentModel === 'net') return p.data.net !== undefined ? "#" + p.data.net : "";
+                        return (p.data[currentModel] && p.data[currentModel][probKey] !== undefined) ? p.data[currentModel][probKey] + "%" : "";
+                    });
 
                 const maxDepth = d.height > 3 ? 3 : d.height; 
                 const chalkTreeData = buildChalkData(d, currentModel, maxDepth);
@@ -232,7 +259,11 @@ d3.json("data.json").then(data => {
                     .attr("text-anchor", p => !p.children ? "end" : (p.depth === 0 ? "start" : "middle"))
                     .text(p => {
                         if (p.depth === 0 && p.data.value !== undefined) {
-                            return p.data.name + (currentModel === 'wab' ? ` (${p.data.value})` : ` (${p.data.value}%)`);
+                            let label = p.data.name;
+                            if (currentModel === 'wab') label += ` (${p.data.value})`;
+                            else if (currentModel === 'net') label += ` (#${p.data.value})`;
+                            else label += ` (${p.data.value}%)`;
+                            return label;
                         }
                         return p.data.name;
                     });
