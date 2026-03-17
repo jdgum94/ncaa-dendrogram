@@ -7,12 +7,16 @@ This project maps the entire 64-team tournament field into a circular hierarchy.
 * **KP** KenPom publicly released tournament probabilities.
 * **EM(i)** Evan Miya publicly released tournament probabilities (injury adjusted, beware).
 * **BT** Bart Torvik publicly released tournament probabilities.
-* **WAB** WAB value.
+* **BT(l10)** Bart Torvik publicly released tournament probabilities filtered to last 10 games.
+* **BT(t100)** Bart Torvik publicly released tournament probabilities filtered to vs. top 100 teams only.
+* **WAB** WAB value comparison.
+* **NET** NET ranking comparison.
 
 ## Features
 * **Multiple Projection Models:** Includes a dropdown toggle to switch seamlessly between **KP**, **EM(i)**, **BT**, and **WAB** probability data.
 * **Interactive Path Tracing:** Hovering over a leaf node (team) highlights their route to the center. Hovering over an internal node (future game) highlights all teams still eligible to reach that spot.
 * **Chalk Tooltip** Hovering over internal node displays a max 3-level depth bracket representation showing the results according to the chosen model; WAB is simply a direct comparison.
+* **Resume Mis-seeding** Center dot selection highlights low and high value seeds according to seed-relative WAB (WAB model only).
 * **Zero-Build Architecture:** No Webpack, Node modules, or complex build steps. Just pure HTML, CSS, and D3.js.
 
 ## Tech Stack
