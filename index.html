@@ -3,58 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bracket Explorer</title>
+    <title>Bracket Explorer V2</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; margin: 0; padding: 0; }
+        body { font-family: sans-serif; text-align: center; margin: 0; padding: 0; overflow: hidden; background: #fafafa; }
         
-        #controls { margin: 15px auto 0 auto; font-size: 16px; position: relative; z-index: 10; }
-        select { font-size: 16px; padding: 4px; }
+        #controls { 
+            position: absolute; 
+            top: 20px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            font-size: 16px; 
+            z-index: 10; 
+            background: rgba(255,255,255,0.9);
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        select { font-size: 16px; padding: 6px; font-weight: bold; cursor: pointer; }
         
-        #bracket-container { margin-top: -40px; }
+        #bracket-container { width: 100vw; height: 100vh; }
         
-        .link { fill: none; stroke: #e0e0e0; stroke-width: 1.5px; transition: stroke-width 0.2s; }
-        .link--active { stroke: #e0e0e0; stroke-width: 3.5px; }
+        /* Whisper-quiet link highlighting */
+        .link { fill: none; stroke: #e0e0e0; stroke-width: 1.5px; transition: stroke 0.2s, stroke-width 0.2s; }
+        .link--active { stroke: #b0b0b0; stroke-width: 2.0px; } 
         
-        .node circle { fill: #999; stroke: #fff; stroke-width: 1.5px; transition: fill 0.2s; }
-        .node--active circle { fill: #666; }
-        
-        .node text { font: 10px sans-serif; transition: font-weight 0.2s; }
+        .node text { font: 11.5px sans-serif; fill: #333; transition: font-weight 0.1s; pointer-events: none; }
         .node--active text { font-weight: bold; fill: #000; }
         
-        .region-label { font-size: 24px; font-weight: bold; fill: #e8e8e8; pointer-events: none; }
-
-        .prob-label {
-            font-size: 11px;
-            font-weight: bold;
-            fill: #0000ee;
-            pointer-events: none;
-            text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 0px 2px 2px rgba(0,0,0,0.2); 
-        }
-
-        #chalk-tooltip {
-            position: absolute;
-            background: rgba(255, 255, 255, 0.96);
-            border: 1px solid #ddd;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-            border-radius: 8px;
-            padding: 12px;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.2s ease-in-out;
-            z-index: 1000;
-            text-align: left;
-        }
-        .mini-link { fill: none; stroke: #ccc; stroke-width: 1.5px; }
-        .mini-node text { font-size: 10.5px; fill: #444; }
-        .mini-node--root text { fill: #0000ee; font-weight: bold; }
-
-        .prob-label-pct { pointer-events: none; }
+        /* Region labels scaled down to 38px */
+        .region-label { font-size: 38px; font-weight: bold; fill: #ebebeb; pointer-events: none; letter-spacing: 6px; text-transform: uppercase; }
     </style>
 </head>
 <body>
 
     <div id="controls">
+        <label for="dataSource"><strong>Analysis Model: </strong></label>
         <select id="dataSource">
             <option value="kenpom">KP</option>
             <option value="miya">EM(i)</option>
@@ -67,7 +51,6 @@
     </div>
 
     <div id="bracket-container"></div>
-    <div id="chalk-tooltip"></div>
 
     <script src="app.js"></script>
 </body>

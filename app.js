@@ -1,117 +1,158 @@
-const width = 900;
-const height = 900;
-const radius = width / 2 - 150; 
+const width = window.innerWidth;
+const height = window.innerHeight;
 
 const svg = d3.select("#bracket-container").append("svg")
     .attr("width", width)
-    .attr("height", height)
-    .append("g")
-    .attr("transform", `translate(${width/2},${height/2})`);
+    .attr("height", height);
 
-const offset = 290;
+const svgGroup = svg.append("g");
 
-const regionLabels = [
-    { name: "West",    x: -offset, y: -offset }, 
-    { name: "Midwest", x: -offset, y: offset },  
-    { name: "East",    x: offset,  y: -offset }, 
-    { name: "South",   x: offset,  y: offset }   
-];
+const treeHeight = 1000; 
+const horizontalSpace = 1200; 
+const centerGap = 80; 
 
-svg.selectAll(".region-label")
-    .data(regionLabels)
-    .enter().append("text")
-    .attr("class", "region-label")
-    .attr("x", d => d.x)
-    .attr("y", d => d.y)
-    .attr("text-anchor", "middle")
-    .attr("dominant-baseline", "middle")
-    .text(d => d.name);
+// Zoom & Pan setup
+const zoom = d3.zoom()
+    .scaleExtent([0.2, 3])
+    .on("zoom", (event) => {
+        svgGroup.attr("transform", event.transform);
+    });
 
-const tree = d3.cluster().size([2 * Math.PI, radius]);
+const scaleFit = Math.min(width / (horizontalSpace + 250), height / (treeHeight + 100));
+const initialTransform = d3.zoomIdentity.translate(width / 2, height / 2).scale(scaleFit);
+svg.call(zoom).call(zoom.transform, initialTransform);
+
 let currentModel = document.getElementById("dataSource").value;
 const depthToProb = {5: 'R32', 4: 'S16', 3: 'E8', 2: 'F4', 1: 'F2', 0: 'Champ'};
-
-// --- ANALYSIS HEURISTICS (WAB ONLY) ---
 const seedAverages = {
     1: 8.5, 2: 7.0, 3: 5.5, 4: 4.5, 5: 3.5, 6: 2.8, 7: 2.0, 8: 1.5,
     9: 1.0, 10: 0.5, 11: 0.1, 12: -0.5, 13: -1.5, 14: -2.5, 15: -3.5, 16: -4.5
 };
 
-function getWinner(d, model) {
-    const leaves = d.leaves();
-    const probKey = depthToProb[d.depth];
+function formatValue(val, model) {
+    if (model === 'net') return `#${-val}`;
+    if (model === 'wab') return (val > 0 ? '+' : '') + val.toFixed(1);
+    return val.toFixed(1) + "%";
+}
+
+function getWinner(nodeObj, model) {
+    const leaves = nodeObj.leaves();
+    const probKey = depthToProb[nodeObj.originalDepth];
     let winnerName = "";
     let maxVal = -Infinity;
 
     leaves.forEach(leaf => {
         let val;
-        if (model === 'net') {
-            // Rank logic: lower rank (1) is better. Negative value makes 1 > 100.
-            val = -(leaf.data.net || 1000);
-        } else if (model === 'wab') {
-            val = (leaf.data.wab || 0);
-        } else {
-            val = (leaf.data[model] && leaf.data[model][probKey]) ? leaf.data[model][probKey] : 0;
-        }
+        if (model === 'net') val = -(leaf.data.net || 1000); 
+        else if (model === 'wab') val = (leaf.data.wab || 0);
+        else val = (leaf.data[model] && leaf.data[model][probKey]) ? leaf.data[model][probKey] : 0;
 
-        if (val > maxVal) { 
-            maxVal = val; 
-            winnerName = leaf.data.name; 
-        }
+        if (val > maxVal) { maxVal = val; winnerName = leaf.data.name; }
     });
-
-    return { name: winnerName, value: model === 'net' ? -maxVal : maxVal };
+    return { name: winnerName, value: maxVal };
 }
 
-function buildChalkData(mainNode, model, maxDepth, currentDepth = 0) {
-    const winnerObj = getWinner(mainNode, model);
-    const winner = winnerObj.name;
-    const val = winnerObj.value; 
-    
-    if (!mainNode.children || currentDepth >= maxDepth) {
-        return { name: winner, value: val };
-    }
-    return {
-        name: winner,
-        value: val, 
-        children: mainNode.children.map(c => buildChalkData(c, model, maxDepth, currentDepth + 1))
-    };
+function getLeafValueAtDepth(leafNode, depth, model) {
+    const probKey = depthToProb[depth];
+    if (model === 'net') return -(leafNode.data.net || 1000);
+    if (model === 'wab') return leafNode.data.wab || 0;
+    return (leafNode.data[model] && leafNode.data[model][probKey]) ? leafNode.data[model][probKey] : 0;
 }
 
 d3.json("data.json").then(data => {
-    const root = tree(d3.hierarchy(data));
+    
+    const root = d3.hierarchy(data);
+    root.each(d => d.originalDepth = d.depth);
 
-    const link = svg.append("g")
+    const leftRoot = root.children[0];
+    const rightRoot = root.children[1];
+
+    const cluster = d3.cluster().size([treeHeight, horizontalSpace / 2]);
+    
+    cluster(leftRoot);
+    leftRoot.each(d => {
+        d.renderX = -d.y - centerGap; 
+        d.renderY = d.x - treeHeight / 2;
+    });
+
+    cluster(rightRoot);
+    rightRoot.each(d => {
+        d.renderX = d.y + centerGap; 
+        d.renderY = d.x - treeHeight / 2;
+    });
+
+    root.renderX = 0;
+    root.renderY = 0; 
+
+    const descendants = [root].concat(leftRoot.descendants(), rightRoot.descendants());
+    const links = leftRoot.links().concat(rightRoot.links(), [
+        { source: root, target: leftRoot },
+        { source: root, target: rightRoot }
+    ]);
+
+    const linkGen = d3.linkHorizontal().x(d => d.renderX).y(d => d.renderY);
+
+    const link = svgGroup.append("g")
         .selectAll("path")
-        .data(root.links())
+        .data(links)
         .join("path")
         .attr("class", "link")
-        .attr("d", d3.linkRadial().angle(d => d.x).radius(d => d.y));
+        .attr("d", linkGen);
 
-    const node = svg.append("g")
+    const node = svgGroup.append("g")
         .selectAll("g")
-        .data(root.descendants())
+        .data(descendants)
         .join("g")
         .attr("class", "node")
-        .attr("transform", d => `rotate(${d.x * 180 / Math.PI - 90}) translate(${d.y},0)`);
+        .attr("transform", d => `translate(${d.renderX},${d.renderY})`);
 
     const internalNodes = node.filter(d => d.children);
-    internalNodes.append("circle").attr("r", 4).style("cursor", "pointer");
-
     const leafNodes = node.filter(d => !d.children);
-    leafNodes.append("text").attr("dy", "0.31em").attr("x", d => d.x < Math.PI ? 6 : -6)
-        .attr("text-anchor", d => d.x < Math.PI ? "start" : "end")
-        .attr("transform", d => d.x >= Math.PI ? "rotate(180)" : null)
+
+    // 1. Visible Dot (No interaction)
+    internalNodes.append("circle")
+        .attr("r", 4.5)
+        .style("fill", "#999")
+        .style("stroke", "#fff")
+        .style("stroke-width", "1.5px")
+        .style("pointer-events", "none"); 
+
+    leafNodes.append("text")
+        .attr("dy", "0.31em")
+        .attr("x", d => d.renderX < 0 ? -8 : 8)
+        .attr("text-anchor", d => d.renderX < 0 ? "end" : "start")
         .text(d => d.data.name);
 
-    const hoverLayer = svg.append("g").attr("class", "hover-layer");
+    internalNodes.append("text")
+        .attr("class", "internal-text")
+        .attr("dy", d => d.originalDepth === 0 ? "-35px" : "-10px") 
+        .attr("text-anchor", "middle")
+        .style("font-size", d => d.originalDepth === 0 ? "14px" : "11px") 
+        .style("font-weight", d => d.originalDepth === 0 ? "bold" : "normal")
+        .style("fill", "#0000ee");
+
+    const regionLabels = [
+        { name: "East", x: -horizontalSpace * 0.35, y: -treeHeight * 0.25 },
+        { name: "South", x: -horizontalSpace * 0.35, y: treeHeight * 0.25 },
+        { name: "Midwest", x: horizontalSpace * 0.35, y: -treeHeight * 0.25 },
+        { name: "West", x: horizontalSpace * 0.35, y: treeHeight * 0.25 }
+    ];
+    
+    svgGroup.selectAll(".region-label")
+        .data(regionLabels)
+        .enter().append("text")
+        .attr("class", "region-label")
+        .attr("x", d => d.x)
+        .attr("y", d => d.y)
+        .attr("text-anchor", "middle")
+        .attr("dominant-baseline", "middle")
+        .text(d => d.name);
 
     function clearHover() {
         link.classed("link--active", false);
         node.classed("node--active", false);
-        leafNodes.selectAll("text").style("fill", "#000"); 
-        hoverLayer.selectAll("*").remove();
-        d3.select("#chalk-tooltip").style("opacity", 0); 
+        internalNodes.select(".internal-text").text(""); 
+        leafNodes.select("text").style("fill", "#333"); 
     }
 
     d3.select("#dataSource").on("change", function() {
@@ -119,11 +160,9 @@ d3.json("data.json").then(data => {
         clearHover();
     });
 
-    // LEAF HOVER
     leafNodes.append("rect")
-        .attr("transform", d => d.x >= Math.PI ? "rotate(180)" : null)
-        .attr("x", d => d.x < Math.PI ? 0 : -110)
-        .attr("y", -12).attr("width", 110).attr("height", 24).attr("fill", "transparent")
+        .attr("x", d => d.renderX < 0 ? -120 : 0)
+        .attr("y", -12).attr("width", 120).attr("height", 24).attr("fill", "transparent")
         .style("cursor", "pointer")
         .on("mouseover", function(event, d) {
             clearHover();
@@ -131,142 +170,45 @@ d3.json("data.json").then(data => {
             link.classed("link--active", l => ancestors.includes(l.source) && ancestors.includes(l.target));
             node.classed("node--active", n => ancestors.includes(n));
 
-            if (currentModel === 'wab') {
-                const value = d.data.wab;
-                if (value !== undefined) {
-                    hoverLayer.append("text").attr("class", "prob-label")
-                        .attr("transform", () => {
-                            const isLeft = d.x >= Math.PI;
-                            const angle = d.x * 180 / Math.PI - 90;
-                            return `rotate(${angle}) translate(${radius - 15},0) ${isLeft ? "rotate(180)" : ""}`;
-                        })
-                        .attr("text-anchor", d.x < Math.PI ? "end" : "start")
-                        .attr("dy", "0.31em").text(value);
-                }
-            } else if (currentModel === 'net') {
-                const value = d.data.net;
-                if (value !== undefined) {
-                    hoverLayer.append("text").attr("class", "prob-label")
-                        .attr("transform", () => {
-                            const isLeft = d.x >= Math.PI;
-                            const angle = d.x * 180 / Math.PI - 90;
-                            return `rotate(${angle}) translate(${radius - 15},0) ${isLeft ? "rotate(180)" : ""}`;
-                        })
-                        .attr("text-anchor", d.x < Math.PI ? "end" : "start")
-                        .attr("dy", "0.31em").text("#" + value);
-                }
-            } else {
-                const modelData = d.data[currentModel];
-                if (modelData) {
-                    const probMapping = [
-                        { node: ancestors[1], value: modelData.R32 }, { node: ancestors[2], value: modelData.S16 },
-                        { node: ancestors[3], value: modelData.E8 }, { node: ancestors[4], value: modelData.F4 },
-                        { node: ancestors[5], value: modelData.F2 }, { node: ancestors[6], value: modelData.Champ }
-                    ];
-
-                    hoverLayer.selectAll(".prob-label").data(probMapping.filter(p => p.node && p.value !== undefined))
-                        .join("text").attr("class", "prob-label")
-                        .attr("transform", p => `translate(${p.node.y * Math.cos(p.node.x - Math.PI / 2)},${p.node.y * Math.sin(p.node.x - Math.PI / 2) - 10})`)
-                        .attr("text-anchor", "middle").text(p => p.value + "%");
-                }
-            }
+            internalNodes.filter(n => ancestors.includes(n))
+                .select(".internal-text")
+                .text(n => {
+                    const val = getLeafValueAtDepth(d, n.originalDepth, currentModel);
+                    return `${d.data.name} (${formatValue(val, currentModel)})`;
+                });
         })
         .on("mouseout", clearHover);
 
-    // INTERNAL HOVER
-    internalNodes.select("circle")
+    // 2. Invisible Hitbox (Massive catch area for smooth hovering)
+    internalNodes.append("circle")
+        .attr("r", 18) 
+        .style("fill", "transparent")
+        .style("cursor", "pointer")
         .on("mouseover", function(event, d) {
             clearHover();
             const descendants = d.descendants();
             link.classed("link--active", l => descendants.includes(l.source) && descendants.includes(l.target));
             node.classed("node--active", n => descendants.includes(n));
 
-            // --- ANALYSIS COLORATION (Center Dot Only - WAB Only) ---
-            if (d.depth === 0 && currentModel === 'wab') {
-                leafNodes.selectAll("text").style("fill", p => {
+            // Populate text for ALL internal nodes within the hovered subtree
+            internalNodes.filter(n => descendants.includes(n))
+                .select(".internal-text")
+                .text(n => {
+                    const w = getWinner(n, currentModel);
+                    return `${w.name} (${formatValue(w.value, currentModel)})`;
+                });
+
+            // Resume Justice WAB Coloration
+            if (d.originalDepth === 0 && currentModel === 'wab') {
+                leafNodes.select("text").style("fill", p => {
                     const seedMatch = p.data.name.match(/\d+/);
                     const seed = seedMatch ? parseInt(seedMatch[0]) : 0;
                     const delta = (p.data.wab || 0) - (seedAverages[seed] || 0);
-                    if (delta >= 2.0) return "#27ae60"; // Value (Underseeded)
-                    if (delta <= -2.0) return "#e74c3c"; // Vulnerable (Overseeded)
-                    return "#000"; // Neutral
+                    
+                    if (delta >= 2.0) return "#27ae60"; 
+                    if (delta <= -2.0) return "#e74c3c"; 
+                    return "#333"; 
                 });
-            }
-
-            const probKey = depthToProb[d.depth];
-
-            if (probKey || currentModel === 'wab' || currentModel === 'net') {
-                const leaves = d.leaves();
-                
-                hoverLayer.selectAll(".prob-label-pct").data(leaves).join("text").attr("class", "prob-label-pct")
-                    .attr("transform", p => `rotate(${p.x * 180 / Math.PI - 90}) translate(${radius - 15},0) ${p.x >= Math.PI ? "rotate(180)" : ""}`)
-                    .attr("text-anchor", p => p.x < Math.PI ? "end" : "start").attr("dy", "0.31em")
-                    .style("font-size", "11px").style("font-weight", "bold").style("fill", "#0000ee")
-                    .text(p => {
-                        if (currentModel === 'wab') return p.data.wab !== undefined ? p.data.wab : "";
-                        if (currentModel === 'net') return p.data.net !== undefined ? "#" + p.data.net : "";
-                        return (p.data[currentModel] && p.data[currentModel][probKey] !== undefined) ? p.data[currentModel][probKey] + "%" : "";
-                    });
-
-                const maxDepth = d.height > 3 ? 3 : d.height; 
-                const chalkTreeData = buildChalkData(d, currentModel, maxDepth);
-                const miniRoot = d3.hierarchy(chalkTreeData);
-                
-                const miniMargin = { top: 10, right: 150, bottom: 10, left: 110 };
-                const miniW = Math.max(40, miniRoot.height * 40); 
-                const miniH_calc = Math.max(40, miniRoot.leaves().length * 24); 
-                
-                const tooltipWidth = miniW + miniMargin.left + miniMargin.right + 24; 
-                const tooltipHeight = miniH_calc + miniMargin.top + miniMargin.bottom + 40; 
-
-                let posX, posY;
-                const isRightHalf = d.x < Math.PI;
-
-                if (d.depth === 0) {
-                    posX = event.pageX - (tooltipWidth / 2);
-                    posY = event.pageY - (tooltipHeight / 2);
-                } else if (d.depth === 1) {
-                    posX = event.pageX + (isRightHalf ? -(tooltipWidth + 15) : 15);
-                    posY = event.pageY - (tooltipHeight / 2);
-                } else {
-                    const isBottomHalf = d.x > Math.PI / 2 && d.x < 3 * Math.PI / 2;
-                    posX = event.pageX + (isRightHalf ? -(tooltipWidth + 15) : 15);
-                    posY = event.pageY + (isBottomHalf ? -(tooltipHeight + 15) : 15);
-                }
-
-                const tt = d3.select("#chalk-tooltip");
-                tt.html(`<div style="font-size: 10px; font-weight: bold; color: #888; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Projected Sub-Bracket</div>`);
-                tt.style("opacity", 1).style("left", posX + "px").style("top", posY + "px");
-
-                const miniSvg = tt.append("svg")
-                    .attr("width", miniW + miniMargin.left + miniMargin.right)
-                    .attr("height", miniH_calc + miniMargin.top + miniMargin.bottom);
-                    
-                const miniG = miniSvg.append("g").attr("transform", `translate(${miniMargin.left}, ${miniMargin.top})`);
-                d3.tree().size([miniH_calc, miniW])(miniRoot);
-
-                miniG.selectAll(".mini-link").data(miniRoot.links()).join("path").attr("class", "mini-link")
-                    .attr("d", d3.linkHorizontal().x(p => miniW - p.y).y(p => p.x));
-
-                const miniNodes = miniG.selectAll(".mini-node").data(miniRoot.descendants()).join("g")
-                    .attr("class", "mini-node")
-                    .classed("mini-node--root", p => p.depth === 0)
-                    .attr("transform", p => `translate(${miniW - p.y},${p.x})`);
-                    
-                miniNodes.append("text")
-                    .attr("dy", p => !p.children ? "0.31em" : (p.depth === 0 ? "0.31em" : "-0.5em"))
-                    .attr("x", p => !p.children ? -6 : (p.depth === 0 ? 6 : 0))
-                    .attr("text-anchor", p => !p.children ? "end" : (p.depth === 0 ? "start" : "middle"))
-                    .text(p => {
-                        if (p.depth === 0 && p.data.value !== undefined) {
-                            let label = p.data.name;
-                            if (currentModel === 'wab') label += ` (${p.data.value})`;
-                            else if (currentModel === 'net') label += ` (#${p.data.value})`;
-                            else label += ` (${p.data.value}%)`;
-                            return label;
-                        }
-                        return p.data.name;
-                    });
             }
         })
         .on("mouseout", clearHover);
