@@ -15,12 +15,9 @@
             transform: translateX(-50%); 
             font-size: 16px; 
             z-index: 10; 
-            background: rgba(255,255,255,0.9);
             padding: 10px 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
-        select { font-size: 16px; padding: 6px; font-weight: bold; cursor: pointer; }
+        select { font-size: 16px; padding: 6px; font-weight: normal; cursor: pointer; }
         
         #bracket-container { width: 100vw; height: 100vh; }
         
@@ -38,13 +35,13 @@
 <body>
 
     <div id="controls">
-        <label for="dataSource"><strong>Analysis Model: </strong></label>
+        <label for="dataSource">Model: </label>
         <select id="dataSource">
-            <option value="kenpom">KP</option>
-            <option value="miya">EM(i)</option>
-            <option value="torvik">BT</option>
-            <option value="torvik_l10">BT(l10)</option>
-            <option value="torvik_t100">BT(t100)</option>
+            <option value="kenpom">KenPom</option>
+            <option value="miya">Miya (Injury)</option>
+            <option value="torvik">Torvik</option>
+            <option value="torvik_l10">Torvik (L10)</option>
+            <option value="torvik_t100">Torvik (T100)</option>
             <option value="wab">WAB</option>
             <option value="net">NET</option>
         </select>
