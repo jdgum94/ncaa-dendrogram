@@ -109,7 +109,7 @@ d3.json("data.json").then(data => {
     const internalNodes = node.filter(d => d.children);
     const leafNodes = node.filter(d => !d.children);
 
-    // 1. Visible Dot (No interaction)
+    // Visible Dots
     internalNodes.append("circle")
         .attr("r", 4.5)
         .style("fill", "#999")
@@ -117,12 +117,34 @@ d3.json("data.json").then(data => {
         .style("stroke-width", "1.5px")
         .style("pointer-events", "none"); 
 
+    // Base Leaf Text Element (Will be populated dynamically)
     leafNodes.append("text")
         .attr("dy", "0.31em")
         .attr("x", d => d.renderX < 0 ? -8 : 8)
-        .attr("text-anchor", d => d.renderX < 0 ? "end" : "start")
-        .text(d => d.data.name);
+        .attr("text-anchor", d => d.renderX < 0 ? "end" : "start");
 
+    // Dynamic Leaf Updating Function
+    function updateLeafLabels() {
+        leafNodes.select("text").text(d => {
+            let valStr = "";
+            if (currentModel === 'net') {
+                valStr = `#${d.data.net || 1000}`;
+            } else if (currentModel === 'wab') {
+                const val = d.data.wab || 0;
+                valStr = (val > 0 ? '+' : '') + val.toFixed(1);
+            } else {
+                // For probability models, default the base display to their R32 advance chance
+                const val = (d.data[currentModel] && d.data[currentModel]['R32']) ? d.data[currentModel]['R32'] : 0;
+                valStr = val.toFixed(1) + "%";
+            }
+            return `${d.data.name} (${valStr})`;
+        });
+    }
+
+    // Run immediately on load
+    updateLeafLabels();
+
+    // Internal Text Container (Empty by default)
     internalNodes.append("text")
         .attr("class", "internal-text")
         .attr("dy", d => d.originalDepth === 0 ? "-35px" : "-10px") 
@@ -155,11 +177,14 @@ d3.json("data.json").then(data => {
         leafNodes.select("text").style("fill", "#333"); 
     }
 
+    // Trigger update on dropdown change
     d3.select("#dataSource").on("change", function() {
         currentModel = this.value;
+        updateLeafLabels();
         clearHover();
     });
 
+    // Leaf Hover Logic
     leafNodes.append("rect")
         .attr("x", d => d.renderX < 0 ? -120 : 0)
         .attr("y", -12).attr("width", 120).attr("height", 24).attr("fill", "transparent")
@@ -179,7 +204,7 @@ d3.json("data.json").then(data => {
         })
         .on("mouseout", clearHover);
 
-    // 2. Invisible Hitbox (Massive catch area for smooth hovering)
+    // Internal Hitbox Logic
     internalNodes.append("circle")
         .attr("r", 18) 
         .style("fill", "transparent")
@@ -190,7 +215,6 @@ d3.json("data.json").then(data => {
             link.classed("link--active", l => descendants.includes(l.source) && descendants.includes(l.target));
             node.classed("node--active", n => descendants.includes(n));
 
-            // Populate text for ALL internal nodes within the hovered subtree
             internalNodes.filter(n => descendants.includes(n))
                 .select(".internal-text")
                 .text(n => {
